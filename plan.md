@@ -50,7 +50,13 @@
 ---
 
 ## Current Task
-**All 3 workstreams complete & verified end-to-end** (backend + extraction + dashboard, live on Neon). Remaining: full 300-patient backfill + Vercel prod deploy. To use LLM extraction: set `ANTHROPIC_API_KEY` + `EXTRACT_USE_LLM=true`.
+**All 3 workstreams + feature round 2 complete & verified** (screenshots). Round 2: PHI unmasked (full names), interactive recharts (decision donut click-to-filter, MCB pie, facility + wound-type bars), SYNC button pipeline (incremental insert/update → recompute → UI refresh + last-sync time + retry-until-responds), multi-wound tag + per-wound claim drawer. Remaining: full 300-patient backfill + Vercel deploy.
+
+## Round 2 features (added per user request — VERIFIED)
+- **No PHI masking** — `display_name_masked` → `display_name` (full name). User: "we do not need to hide anything".
+- **Interactive charts** (`Charts.tsx`, recharts): decision donut (click slice → filter), MCB pie, patients-per-facility bar, wound-types bar. Hover tooltips.
+- **SYNC pipeline** (`/api/sync` POST `syncIncremental`): pulls patients changed since last sync, inserts new / updates changed (per-table upserts), records `sync_meta.last_sync_at`; UI refetches `/api/eligibility` (status recomputed on read). Button shows "Last sync" + retries until the API responds (client + `MAX_RETRIES=12`).
+- **Multiple wounds**: extraction returns ALL wounds (deduped by type+size); `multiple_wounds` flag + "N wounds" tag in table; drawer lists each wound with its own claim status (decision badge + fields + reason + evidence).
 
 ---
 

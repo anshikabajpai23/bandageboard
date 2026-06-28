@@ -77,14 +77,32 @@ export function displayName(p: Patient): string {
   return `${name} (${p.patient_id})`;
 }
 
-/** Claim status for a single wound (reuses the patient-level rules). */
+/**
+ * Claim status for a single wound — runs the FULL rule set (coverage, healed/
+ * resolved language, conflict, confidence, missing fields) per wound, not just
+ * the wound-specific checks. Coverage and "latest documentation says healed"
+ * are patient-wide signals (same Medicare coverage, same most-recent note
+ * applies to every wound of that patient), so they agree across all of a
+ * patient's wounds; confidence/missing-fields are wound-specific and can
+ * legitimately differ wound-to-wound.
+ */
 export function decideWound(
   patient: Patient,
   coverage: Coverage[],
   diagnoses: Diagnosis[],
-  wound: ExtractedWound
+  wound: ExtractedWound,
+  conflict?: boolean,
+  latestWoundText?: string | null
 ): WoundClaim {
-  const { decision, reason } = decide({ patient, coverage, diagnoses, wound, hadClinicalSource: true });
+  const { decision, reason } = decide({
+    patient,
+    coverage,
+    diagnoses,
+    wound,
+    hadClinicalSource: true,
+    conflict,
+    latestWoundText,
+  });
   return { wound, decision, reason };
 }
 

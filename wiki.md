@@ -25,15 +25,29 @@ Built by **3 developers** against a shared contract (`/lib/types.ts`) + mocks.
 | `system_health.md` | `/system_health.md` | Health status board |
 | `wiki.md` | `/wiki.md` | This file |
 
-## Planned Code Layout (Phase 0 onward — not yet created)
+## Code Layout (Person 1 built; ✅ = exists)
 | Path | Owner | Purpose |
 |------|-------|---------|
-| `/lib/types.ts` | All (Phase 0) | Shared contract: entity + `ExtractedWound` + `EligibilityResult` types |
-| `/lib/mocks.ts` | All (Phase 0) | Fake `EligibilityResult[]` so dashboard starts immediately |
-| `/lib/ingest`, `/app/api/sync` | Person 1 | PCC client, retry/backoff, id mapping, chunked upserts, cron |
-| `/lib/eligibility`, `/app/api/*` | Person 1 | Routing rules, reason gen, `GET /api/eligibility`, PHI masking |
-| `/lib/extract` | Person 2 | `extractWound()`, de-id, regex + LLM parsers, confidence |
-| `/app`, `/components` | Person 3 | Biller dashboard table, cards, detail drawer, deploy |
+| `lib/types.ts` ✅ | All (Phase 0) | Shared contract: entity + `ExtractedWound` + `EligibilityResult` types |
+| `lib/mocks.ts` ✅ | All (Phase 0) | 3 fake `EligibilityResult` rows so dashboard starts immediately |
+| `lib/db/schema.ts` ✅ | Person 1 | Drizzle tables (5 entities + `sync_cursor`); `raw` jsonb audit column |
+| `lib/db/client.ts` ✅ | Person 1 | postgres-js + drizzle connection (pooled, reused) |
+| `lib/ingest/client.ts` ✅ | Person 1 | PCC API client: 429 `Retry-After` + backoff retry; pure helpers exported |
+| `lib/ingest/sync.ts` ✅ | Person 1 | id↔patient_id resolution, chunked idempotent upserts, resumable `syncSlice` |
+| `lib/eligibility/engine.ts` ✅ | Person 1 | Deterministic routing + reason + danger rules (pure, testable) |
+| `lib/eligibility/compute.ts` ✅ | Person 1 | DB rows → `EligibilityResult[]`; conflict detect; PHI masking enforced here |
+| `lib/extract/index.ts` ✅ STUB | Person 2 | `extractWound(source)` — assessment JSON + SPN regex; Envive→null. **P2 replaces.** |
+| `app/api/eligibility/route.ts` ✅ | Person 1 | `GET` → `{ summary, results }`, filters facility/decision/payer |
+| `app/api/sync/route.ts` ✅ | Person 1 | `GET`/`POST` one ingestion slice (cron + manual), optional `SYNC_SECRET` |
+| `app/page.tsx`, `app/layout.tsx` ✅ placeholder | Person 3 | Dashboard shell — **P3 replaces** with table/cards/drawer |
+| `scripts/ingest.ts` ✅ | Person 1 | CLI backfill (`npm run ingest`) |
+| `scripts/test-logic.ts` ✅ | Person 1 | Pure routing + retry + extraction tests (no DB/net), 15 cases |
+| `scripts/test-api.ts` ✅ | Person 1 | Live PCC retry smoke test (network, no DB) |
+| `scripts/verify.ts` ✅ | Person 1 | DB→decisions end-to-end check + PHI leak guard (`npm run verify`) |
+| `scripts/inspect.ts` ✅ | Person 1 | Debug: dump raw stored coverage/assessment/note values |
+| `.env` ✅ | local only (gitignored) | Secrets: `DATABASE_URL` (Neon), `PCC_BASE_URL`. NOT `.env.local`. |
+| `vercel.json` ✅ | Person 1 | Cron → `/api/sync` per facility |
+| `/components` | Person 3 | Dashboard components (not yet created) |
 
 ## Key Anchors
 | Anchor | File:Line | Describes |

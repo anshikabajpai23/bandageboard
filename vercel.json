@@ -1,0 +1,16 @@
+{
+  "crons": [
+    {
+      "path": "/api/sync?facility=101&limit=25",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/sync?facility=102&limit=25",
+      "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/sync?facility=103&limit=25",
+      "schedule": "30 * * * *"
+    }
+  ]
+}

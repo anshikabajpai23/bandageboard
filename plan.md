@@ -41,39 +41,37 @@
 ---
 
 ## Phase 0 — Shared Contract (DO TOGETHER FIRST, ~30 min) — UNBLOCKS EVERYONE
-- [ ] Scaffold Next.js 14 + TS + Tailwind + Drizzle. Commit `package.json`, `.env.example`.
-- [ ] Write `/lib/types.ts`: `Patient`, `Diagnosis`, `Coverage`, `Note`, `Assessment`, `ExtractedWound`, `EligibilityResult` (shapes from ARCHITECTURE.md §4).
-- [ ] Write `/lib/mocks.ts`: 5–10 fake `EligibilityResult` rows (one per decision type) so Person 3 starts immediately.
-- [ ] Agree the HTTP contract: `GET /api/eligibility` returns `EligibilityResult[]`.
+- [x] Scaffold Next.js 14 + TS + Drizzle. `package.json`, `tsconfig`, `.env.example`. (Tailwind = Person 3.)
+- [x] Write `/lib/types.ts`: `Patient`, `Diagnosis`, `Coverage`, `Note`, `Assessment`, `ExtractedWound`, `EligibilityResult`.
+- [x] Write `/lib/mocks.ts`: 3 fake `EligibilityResult` rows (one per decision type) so Person 3 starts immediately.
+- [x] HTTP contract: `GET /api/eligibility` returns `{ summary, results: EligibilityResult[] }`.
 - [ ] Push `main` with this skeleton. Everyone branches from here.
 
 ---
 
 ## Current Task
-Bootstrap the 3-person parallel build. Phase 0 contract → 3 independent workstreams → integrate → deploy.
+Person 1 (backend) complete. Next: Person 2 swaps the extraction stub; Person 3 builds the dashboard; then integrate per CODE-SYNC PROMPT.
 
 ---
 
 ## The 3 Parallel Workstreams
 
-### Person 1 — Backend Data & Decision  `/lib/ingest`, `/lib/eligibility`, `/app/api/*`
+### Person 1 — Backend Data & Decision  `/lib/ingest`, `/lib/eligibility`, `/app/api/*`  ✅ DONE
 Owns the DB schema (the contract), ingestion, the routing engine, and the API boundary. The whole server.
 **Micro-tasks:**
-- [ ] DB schema in Drizzle: `patients, diagnoses, coverage, notes, assessments` + processed `eligibility` table. Raw JSON columns for audit.
-- [ ] API client: `Retry-After`-aware retry + exponential backoff for 429; handle 422/500 cleanly.
-- [ ] Resolve `patient_id` ↔ `id`; fetch all 5 entity types per patient across facilities 101/102/103.
-- [ ] Chunked, idempotent upserts (resumable across cron runs — one slice per invocation, Vercel timeout-safe).
-- [ ] Vercel Cron config (`vercel.json`) → `/app/api/sync`. **Bonus:** incremental `since` sync.
-- [ ] Eligibility engine: active-MCB check (`payer_type="Medicare B"` AND `effective_to=null`); active-wound check (active diagnosis OR extracted wound).
-- [ ] Routing rules (deterministic):
-      - `auto_accept` — active MCB + active wound + type + stage(if pressure ulcer) + location + L/W/D + drainage all present + evidence + no conflicts.
-      - `flag_for_review` — anything missing / ambiguous / Envive / low confidence / note-vs-assessment conflict.
-      - `reject` — no reliable extraction possible.
-- [ ] Reason generator (plain English) + evidence snippet per field. Conflict + missing-doc detection.
-- [ ] `GET /api/eligibility` (filters: facility / decision / payer). Enforce PHI masking here — emit `display_name_masked` only.
-- [ ] Stub `extractWound()` with a trivial passthrough until Person 2 lands, so routing + API are testable solo.
-**Provides:** populated DB + `/api/eligibility` serving `EligibilityResult[]`.
-**Independent because:** works against the live PCC API + own data immediately; only inbound dep is Person 2's `ExtractedWound` shape (already in contract).
+- [x] DB schema in Drizzle (`lib/db/schema.ts`): `patients, diagnoses, coverage, notes, assessments` + `sync_cursor`. `raw` jsonb audit column on every table.
+- [x] API client (`lib/ingest/client.ts`): `Retry-After`-aware retry + exponential backoff for 429; retry 5xx; 422 fails loud. Pure helpers exported for tests.
+- [x] Resolve `patient_id` ↔ `id`; fetch all 5 entity types per patient across facilities 101/102/103 (`lib/ingest/sync.ts`).
+- [x] Chunked, idempotent upserts (resumable via `sync_cursor`; `syncSlice` is timeout-safe, `onConflictDoUpdate` everywhere).
+- [x] Vercel Cron config (`vercel.json`) → `/app/api/sync`. Incremental `since` sync supported (bonus).
+- [x] Eligibility engine (`lib/eligibility/engine.ts`): active-MCB + active-wound checks.
+- [x] Routing rules (deterministic) — auto_accept / flag_for_review / reject, encoding the top-3 dangers (missing≠negative).
+- [x] Reason generator (plain English) + evidence snippet + conflict + missing-doc detection.
+- [x] `GET /api/eligibility` (filters: facility / decision / payer). PHI masked in `compute.ts` — only `display_name_masked` leaves.
+- [x] Stub `extractWound()` (`lib/extract/index.ts`) — assessment JSON + SPN regex; Envive → null. **Person 2 replaces.**
+- [x] Tests: `scripts/test-logic.ts` (no DB/net), `scripts/test-api.ts` (live retry), `scripts/ingest.ts` (CLI backfill).
+**Provides:** populated DB + `/api/eligibility` serving `{ summary, results }`.
+**Seam for Person 2:** swap the stub `extractWound()` — signature `extractWound(source) → ExtractedWound | null` is fixed.
 
 ### Person 2 — Extraction & De-identification (PHI core)  `/lib/extract`
 The hardest accuracy work. Pure functions over note/assessment JSON — no DB needed early.
@@ -199,3 +197,6 @@ npx vercel --prod
 ## Done
 - [x] IHMS state files initialized (`plan.md`, `selfcorrection.md`, `system_health.md`, `wiki.md`).
 - [x] Read all project docs; re-planned 4-person ARCHITECTURE split into 3 independent workstreams.
+- [x] ARCHITECTURE.md reconciled to the 3-person plan (plan.md = source of truth).
+- [x] **Person 1 implemented + VERIFIED** on real Neon DB + live API: 15/15 logic tests, live 429-retry, db:push, ingest, `npm run verify` (4 auto/6 flag/7 reject, PHI-safe), `GET /api/eligibility` HTTP 200 with exact contract. Fixed real-data gotchas (MCB via `payer_code`; nested assessment shapes; `.env` precedence). (Awaiting Person 2/3 + integration.)
+- [ ] **Before demo:** full 300-patient backfill — `npm run ingest` (only 17 ingested so far; resumable, ~85s/10 patients due to 429s).

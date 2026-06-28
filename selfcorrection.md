@@ -16,6 +16,15 @@
 | 1 | 2026-06-28 | Re-split the 4-person architecture into a 3-person plan. | plan.md / team structure |
 | 2 | 2026-06-28 | Append a sync prompt + deploy/run steps to the plan. | plan.md format |
 
+## Real-Data Facts (verified by ingesting the live API — trust over API.md)
+- Active Medicare Part B = `coverage.payer_code === "MCB"` AND `effective_to === null`. `payer_type` is "Medicare" for both Part A and B — useless as discriminator.
+- Assessment `raw_json` shape is nested `{sections:[{questions:[{question,answer}]}]}` or a single free-text "Wound narrative" answer. NOT the flat `{wound_type, length_cm,...}` from the docs.
+- Notes are prose ("Measures 5.9 x 4.5cm, depth 1.8cm") or Envive narratives, rarely clean SPN labels.
+
 ## Do-Not-Repeat List
 - Don't plan around 4 people. It's 3.
 - Don't mix `patient_id` (string) and integer `id` across API endpoints (project hard rule).
+- Don't trust API.md field shapes/values — verify against ingested data first.
+- Don't put secrets only in `.env.local` if tsx/drizzle scripts need them — those read `.env` via dotenv. Conversely an empty `.env.local` shadows `.env` in Next. Keep one source: `.env`.
+- Don't pin `@next/swc-*` platform binaries as hard deps — breaks cross-platform (Vercel) installs.
+- `--limit` in `ingest` = slice size, not a total cap. Use `--once` for a true single-slice smoke test.

@@ -4,7 +4,13 @@
 
 ## Last Sync
 - Timestamp: 2026-06-28
-- Triggering task: Implement + VERIFY Person 3 (biller dashboard) — all 3 workstreams now done.
+- Triggering task: Round 2 — unmask PHI, interactive charts, SYNC pipeline, multi-wound claims. All verified via screenshots.
+
+## Round 2 verification
+- `npm run build` green (recharts bundled; First Load 196kB on /). NOTE: after adding a dep, `rm -rf .next` before rebuild (stale vendor chunk → 500 "Cannot find module vendor-chunks/lodash.js").
+- `npm run verify` → multi-wound patients: 7/17 (after tightening dedup from 11); full names; shape PASS.
+- Screenshots confirmed: full names, "N wounds" tags on the 7 multi-wound patients, decision donut + facility/wound bars (interactive tooltips), SYNC button + "Never synced", per-wound claim drawer (Helen Reyes: diabetic foot ulcer Ready 90% + Unknown Needs-review 55%).
+- `db:push`: drizzle-kit 0.28 emits spurious `DROP CONSTRAINT *_not_null` on re-push (42P16 on PK) — schema is correct + applied; fresh DB pushes clean. Cosmetic.
 
 ## Structural Integrity — ALL 3 WORKSTREAMS VERIFIED GREEN ✅
 - `npm run test:logic` → 22/22 pass (retry + routing + de-id + multi-wound + evidence + healed/resolved).

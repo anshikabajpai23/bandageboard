@@ -45,8 +45,9 @@ Built by **3 developers** against a shared contract (`/lib/types.ts`) + mocks.
 | `app/page.tsx`, `app/layout.tsx` ✅ | Person 3 | Renders `<Dashboard/>`; layout imports Tailwind `globals.css` |
 | `components/Dashboard.tsx` ✅ | Person 3 | Client orchestrator: fetch `/api/eligibility` (mock fallback), filters, sort, state |
 | `components/SummaryCards.tsx` ✅ | Person 3 | Counts per decision + % ready to bill |
-| `components/EligibilityTable.tsx` ✅ | Person 3 | Color-coded sortable table; row→drawer |
-| `components/DetailDrawer.tsx` ✅ | Person 3 | Wound fields, reason, evidence, confidence, masked id |
+| `components/Charts.tsx` ✅ | Person 3 | Interactive recharts: decision donut (click→filter), MCB pie, facility + wound-type bars |
+| `components/EligibilityTable.tsx` ✅ | Person 3 | Color-coded sortable table; "N wounds" tag; row→drawer |
+| `components/DetailDrawer.tsx` ✅ | Person 3 | Full name + per-wound claim cards (each with its own decision/fields/evidence) |
 | `components/decision.ts` ✅ | Person 3 | Shared decision colors/labels + dims helper |
 | `tailwind.config.ts`, `postcss.config.mjs`, `app/globals.css` ✅ | Person 3 | Tailwind setup |
 | `scripts/ingest.ts` ✅ | Person 1 | CLI backfill (`npm run ingest`) |

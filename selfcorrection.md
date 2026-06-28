@@ -35,6 +35,13 @@
 - threshold.md requires "latest documentation says wound healed/resolved → `reject`" as a hard rule + dangerous-edge-case test. The original engine.ts had zero handling of this — fixed by adding `HEALED_RE`/`ACTIVE_RE` checks in `decide()`, fed by `latestWoundText` (most recently dated note/assessment) computed in `compute.ts`.
 - Conflicting healed+active language in the *same* latest doc → `flag_for_review`, never `reject` — matches the team rule "extra flags are acceptable, wrong auto_accept/reject are not."
 - This check runs right after the active-MCB confirmation, before the missing-wound branch, so a stale-but-complete wound record from an earlier date can't out-rank a newer "healed" note.
+## Round 2 Decisions / Lessons
+- **PHI no longer masked** — user said "we do not need to hide anything." `display_name_masked` renamed `display_name` (full name). Earlier PHI-masking work is reverted by user request; don't re-add masking.
+- Multi-wound: extraction returns ALL wounds; dedupe by wound_type + size (within 1cm) so the same wound across a note+assessment isn't double-counted. Each wound gets its own claim status (`decideWound`).
+- SYNC button = POST `/api/sync` (incremental `syncIncremental`); GET = last-sync time; GET+facility = cron slice. Status is recomputed on read, so UI just refetches `/api/eligibility` after sync.
+- After `npm install <new dep>`, run `rm -rf .next` before `npm run build` — stale `.next` causes runtime 500 `Cannot find module './vendor-chunks/<dep>.js'` (hit with recharts→lodash).
+- drizzle-kit 0.28 re-push emits bogus `DROP CONSTRAINT *_not_null` (NOT NULL isn't a named PG constraint) → 42P16 on PK columns. Harmless; schema applies on a fresh DB.
+- Don't put `.default()` on an integer primary-key column in Drizzle — triggers a failing ALTER on push.
 
 ## Do-Not-Repeat List
 - Don't plan around 4 people. It's 3.

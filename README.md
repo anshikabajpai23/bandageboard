@@ -192,8 +192,13 @@ Overrides persist across re-syncs (stored in a separate `decision_overrides` tab
 
 ## PHI Handling
 
-- All LLM calls receive de-identified text only — names, DOB, and patient IDs are stripped before sending to Anthropic
+- All LLM calls receive de-identified text only: names, DOB, and patient IDs are stripped before sending to Anthropic
 - Patient identifiers in the UI display only what is needed for billing workflow
 - No PHI is logged to console or error traces
 
 ---
+## AI decision 
+<img width="1417" height="738" alt="Screenshot 2026-06-30 at 10 50 48 PM" src="https://github.com/user-attachments/assets/beb1f3eb-4ebd-4a52-90cc-69d4b76d6e52" />
+
+
+

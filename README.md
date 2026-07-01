@@ -1,7 +1,7 @@
 
 # BandageBoard
 
-**Medicare Part B wound-care billing triage dashboard** — built for the ABI Frameworks Hackathon.
+**Medicare Part B wound-care billing triage dashboard**, built for the ABI Frameworks Hackathon.
 
 BandageBoard ingests patient data from a mock PointClickCare (PCC) EHR API, extracts wound details from clinical notes and structured assessments, and routes each patient to a biller decision in real time: **auto-accept**, **flag for review**, or **reject**.
 <img width="1283" height="671" alt="Screenshot 2026-06-30 at 10 45 30 PM" src="https://github.com/user-attachments/assets/d7bdbc6b-90b5-4a1b-b851-fec324849468" />
@@ -200,5 +200,38 @@ Overrides persist across re-syncs (stored in a separate `decision_overrides` tab
 ## AI decision 
 <img width="1417" height="738" alt="Screenshot 2026-06-30 at 10 50 48 PM" src="https://github.com/user-attachments/assets/beb1f3eb-4ebd-4a52-90cc-69d4b76d6e52" />
 
+---
+# Future Scope
+
+Planned enhancements beyond the current build.
+
+1. Auto-update via Kafka queue
+-Stream patient/wound record changes through a Kafka queue so eligibility
+results update automatically instead of on manual sync. Producers push source
+changes; consumers re-run extraction + decision and upsert results live.
+
+2. Docker pods (backup servers with auto-restart)
+-Containerize the app and run multiple replicas (backup servers) with automatic
+restart on failure (e.g. Docker Compose `restart: always` or Kubernetes pods
+with liveness probes) for high availability.
+
+3. Patient history
+-Track full history per patient : past wound claims, prior decisions, and
+status changes over time, instead of only the latest snapshot.
+
+### Optimization
+
+Caching
+- Add caching to reduce recomputation and DB load: cache eligibility results
+and frequently read queries; invalidate on relevant updates from the Kafka
+queue (see #1).
+
+### Features
+
+Group patients by rejection reason
+- Group/cluster patients by their rejection reason so billers can triage similar
+rejects together (e.g. "no active MCB", "low confidence", "missing measurements").
+
+---
 
 

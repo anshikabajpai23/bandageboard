@@ -1,137 +1,197 @@
-# ABI Frameworks Hackathon
+# BandageBoard
 
-## The Challenge
+**Medicare Part B wound-care billing triage dashboard** — built for the ABI Frameworks Hackathon.
 
-You are building a data pipeline for a post-acute care company that needs to identify which patients qualify for wound care billing under Medicare Part B.
-
-Patient data lives in an EHR system called PointClickCare (PCC). Your pipeline will pull from a mock PCC API, extract clinical wound details from free-text notes and structured assessments, and produce a clean output that tells a biller which patients to act on — and why.
-
-The API is rate-limited and will occasionally refuse requests. Your pipeline must handle that gracefully.
+BandageBoard ingests patient data from a mock PointClickCare (PCC) EHR API, extracts wound details from clinical notes and structured assessments, and routes each patient to a biller decision in real time: **auto-accept**, **flag for review**, or **reject**.
 
 ---
 
-## Background
+## Features
 
-Wound care billing under Medicare Part B requires that a patient has:
+- **Resumable chunked ingestion** — pulls 300 patients across 3 facilities with `Retry-After`-aware exponential backoff (handles the API's 30% synthetic 429 rate); idempotent upserts mean any interrupted run can pick up where it left off
+- **Multi-format wound extraction** — regex parsers for SOAP/prose/structured notes; optional LLM upgrade (Claude claude-opus-4-8) for hard Envive narratives, with PHI stripped before any API call
+- **Multi-wound support** — deduplicates wounds seen in both a note and an assessment; keeps distinct wounds separate; primary = largest area
+- **Deterministic rules engine** — coverage → healed-language detection → active wound check → conflict/confidence/missing-fields → `auto_accept` / `flag_for_review` / `reject` + plain-English reason, all without an LLM
+- **Manual decision override** — billers can override any wound's routing decision from the detail drawer; overrides persist across re-syncs and are fully reversible with an audit trail
+- **"Why this decision?" LLM explanation** — streaming Claude summary per wound on demand
+- **PDF export** — print-ready patient detail sheet generated client-side (no server round-trip)
+- **Dashboard** — color-coded table, facility/decision/payer filters, summary stat cards, clickable detail drawer per patient
 
-1. An **active wound** (pressure ulcer, diabetic foot ulcer, venous ulcer, etc.)
-2. **Active Medicare Part B coverage**
-3. Documented wound measurements (length, width, depth) and drainage level
+---
 
-A biller reviews eligible patients and decides whether to submit a claim. Your job is to automate the data collection and triage steps that currently happen manually.
+## Tech Stack
 
-**Routing decisions:**
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 14 (App Router) + TypeScript |
+| Database | Vercel Postgres (Neon) via Drizzle ORM |
+| LLM | Anthropic claude-opus-4-8 (extraction + summaries) |
+| UI | Tailwind CSS + custom components |
+| Deploy | Vercel |
+
+---
+
+## Project Structure
+
+```
+app/
+  api/
+    eligibility/        # GET (list with filters), POST/DELETE (overrides)
+    summarize/          # Streaming LLM "why this decision?" endpoint
+    sync/               # Trigger data ingestion
+  page.tsx              # Dashboard entry point
+  layout.tsx
+
+components/
+  Dashboard.tsx         # Main dashboard with filter state and data loading
+  DetailDrawer.tsx      # Per-patient slide-over: wound cards, overrides, PDF
+  EligibilityTable.tsx  # Color-coded sortable patient table
+  SummaryCards.tsx      # Auto-accept / flag / reject count cards
+  Charts.tsx            # Facility breakdown charts
+  decision.ts           # Decision metadata (labels, colors, badges)
+
+lib/
+  types.ts              # Shared TypeScript contracts (Patient, WoundClaim, etc.)
+  db/
+    schema.ts           # Drizzle schema (patients, notes, assessments, overrides…)
+    client.ts           # DB connection
+  eligibility/
+    engine.ts           # Pure rules engine — no DB, no network
+    compute.ts          # Joins DB rows → EligibilityResult[]
+    overrides.ts        # Per-wound override persistence
+  extract/              # Wound extraction (regex + optional LLM)
+  ingest/               # PCC API client with retry/backoff
+
+scripts/
+  ingest.ts             # One-shot full ingest (all facilities)
+  test-logic.ts         # 22-case rules engine unit tests
+  test-api.ts           # API integration tests
+  test-llm.ts           # LLM extraction smoke tests
+  verify.ts             # Data quality checks
+```
+
+---
+
+## Decision Logic
+
+The routing engine (`lib/eligibility/engine.ts`) runs these rules **in order** for every wound:
+
+```
+1. Coverage unavailable?          → flag_for_review
+2. No active Medicare Part B?     → reject
+3. Latest note says wound healed? → reject  (conflicting healed+active → flag)
+4. No wound extracted?
+   └─ No clinical source at all?  → reject
+   └─ Extraction failed?          → flag_for_review
+5. Note/assessment conflict?      → flag_for_review
+6. Confidence < 75%?              → flag_for_review
+7. Missing required fields?       → flag_for_review   (missing ≠ negative)
+8. All fields present, confident, unconflicted → auto_accept
+```
+
+Multi-wound patients: each wound gets its own decision. The patient-level decision mirrors the primary wound (`wounds[0]`, largest area).
+
+See [`threshold.md`](./threshold.md) for the full team contract behind these rules.
+
+---
+
+## Routing Decisions
 
 | Decision | Meaning |
 |---|---|
-| `auto_accept` | All required fields are clearly documented — safe to route to billing |
-| `flag_for_review` | Data is ambiguous or incomplete — a clinician or biller should review |
-| `reject` | Reliable extraction is not possible — do not route to billing |
+| `auto_accept` | All required fields documented, confident, unconflicted — safe to route to billing |
+| `flag_for_review` | Data ambiguous, incomplete, or conflicting — biller should review |
+| `reject` | Clear negative evidence (no MCB, wound healed/resolved, no wound at all) |
 
 ---
 
-## The Data
+## Local Setup
 
-The API exposes **300 synthetic patients** across three facilities. No real PHI is used.
+### Prerequisites
 
-| Facility | `facility_id` | Patients |
-|---|---|---|
-| Facility A | `101` | 120 |
-| Facility B | `102` | 90 |
-| Facility C | `103` | 90 |
+- Node.js 18+
+- A Vercel Postgres database (or any Postgres connection string)
+- Anthropic API key (for LLM extraction/summaries — optional if `EXTRACT_USE_LLM` is false)
 
-**Payer mix:** ~60% Medicare Part B, ~15% Medicare Part A, ~10% Medicaid, ~15% HMO. Only Medicare Part B patients are eligible for the billing workflow.
+### 1. Install dependencies
 
-**Note formats you will encounter:**
+```bash
+npm install
+```
 
-| Format | Description |
+### 2. Configure environment variables
+
+Create a `.env.local` file:
+
+```env
+# Vercel Postgres connection
+POSTGRES_URL="postgres://..."
+
+# PCC mock API
+PCC_API_BASE="https://hackathon.prod.pulsefoundry.ai"
+PCC_API_KEY="your-api-key"
+
+# Anthropic (optional — set to "true" to enable LLM extraction)
+ANTHROPIC_API_KEY="sk-ant-..."
+EXTRACT_USE_LLM="false"
+```
+
+### 3. Push the database schema
+
+```bash
+npx drizzle-kit push
+```
+
+### 4. Ingest patient data
+
+```bash
+npm run ingest
+```
+
+This fetches all 300 patients across facilities 101/102/103, handles 429 rate limits automatically, and upserts into Postgres. Safe to re-run — idempotent.
+
+### 5. Start the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Available Scripts
+
+| Script | What it does |
 |---|---|
-| SOAP | Fully structured — wound type, stage, and dimensions are explicit labeled fields |
-| Prose | Abbreviated free text with shorthand like `Meas 4.2x3.1x1.5cm` |
-| Multi-wound | Describes two wounds; you must identify the primary wound |
-| Envive | All clinical details packed into a single unstructured narrative paragraph |
-
-**Wound types:** pressure ulcer (stages 2–4 and unstageable), diabetic foot ulcer, venous stasis ulcer, arterial ulcer, surgical site infection, abscess, burn.
-
----
-
-## The API
-
-**Base URL:** `https://hackathon.prod.pulsefoundry.ai`
-
-Full endpoint documentation is in [API.md](./API.md). The short version:
-
-| Endpoint | What it returns |
-|---|---|
-| `GET /pcc/patients?facility_id=101` | All patients for a facility |
-| `GET /pcc/diagnoses?patient_id=FA-001` | ICD-10 diagnoses for a patient |
-| `GET /pcc/coverage?patient_id=FA-001` | Insurance coverage records |
-| `GET /pcc/notes?patient_id=1` | Free-text clinical progress notes |
-| `GET /pcc/assessments?patient_id=1` | Structured wound assessment forms |
-
-**Important — two patient identifiers:**
-- `patient_id` (string, e.g. `FA-001`) — use this for `/diagnoses` and `/coverage`
-- `id` (integer, e.g. `1`) — use this for `/notes` and `/assessments`
-
-Both are returned by the `/patients` endpoint.
-
-**Rate limiting:** Every request has a **30% chance of returning HTTP 429**. The response includes a `Retry-After` header. You must implement retry logic — pipelines that don't handle 429s will fail to load data. See [API.md](./API.md) for recommended retry patterns.
+| `npm run dev` | Start Next.js dev server |
+| `npm run build` | Production build |
+| `npm run ingest` | Full data ingest from PCC API |
+| `npm run test:logic` | Run 22-case rules engine tests |
+| `npm run test:api` | API integration tests |
+| `npm run test:llm` | LLM extraction smoke test |
+| `npm run verify` | Data quality checks on current DB contents |
+| `npm run db:studio` | Open Drizzle Studio (DB browser) |
 
 ---
 
-## What to Build
+## Manual Override
 
-### Required
+Billers can override any wound's routing decision directly from the detail drawer:
 
-**1. Data ingestion pipeline**
-Fetch all patients, diagnoses, coverage, notes, and assessments from the API. Handle rate limiting. Store the results somewhere queryable (a local database, dataframe, files — your choice).
+1. Click any patient row to open the drawer
+2. Each wound card has **Mark ready to bill / Flag for review / Reject** buttons
+3. Add an optional note explaining the change (e.g. "Verified MCB by phone 6/28")
+4. Click **Revert** to restore the system's original decision
 
-**2. Wound data extraction**
-From each progress note and assessment, extract:
-- Wound type
-- Wound stage (for pressure ulcers)
-- Location
-- Measurements: length, width, depth (cm)
-- Drainage amount (`none` / `light` / `moderate` / `heavy`)
-
-**3. Eligibility output table**
-Produce one row per patient with:
-- Extracted wound fields (above)
-- Whether the patient has active Medicare Part B coverage
-- A routing decision: `auto_accept`, `flag_for_review`, or `reject`
-- A plain-English reason for the decision
-
-**4. Presentation**
-Walk us through your output as if presenting to a non-technical biller. What do they see? How do they know what to act on?
-
-**5. Visual output**
-Display your results in a visual format — a dashboard, UI, or interactive table. A biller should be able to see patient routing decisions at a glance without reading raw data.
-
-### Optional / Bonus
-
-- Use an LLM or agent to assist with extraction or generate a summary narrative per patient
-- Implement incremental sync using the `since` parameter (only fetch records modified since your last run)
+Overrides persist across re-syncs (stored in a separate `decision_overrides` table untouched by ingestion) and are fully auditable — the system's original decision and reason are always preserved alongside the override.
 
 ---
 
-## Judging Criteria
+## PHI Handling
 
-| Area | What we're looking for |
-|---|---|
-| **Pipeline design** | Does it handle API failures gracefully? Is the data flow clear and maintainable? |
-| **Extraction accuracy** | Are wound fields correctly pulled from both structured and free-text notes? |
-| **Schema & data modeling** | Is the output well-structured and easy to query? |
-| **Presentation** | Can you explain your output to a non-technical audience? Is the routing logic easy to follow? |
-| **Problem-solving approach** | How did you handle ambiguous cases? What tradeoffs did you make? |
-
-There is no single correct solution. We care more about your reasoning and methodology than a perfect accuracy score. Be prepared to explain your decisions.
+- All LLM calls receive de-identified text only — names, DOB, and patient IDs are stripped before sending to Anthropic
+- Patient identifiers in the UI display only what is needed for billing workflow
+- No PHI is logged to console or error traces
 
 ---
-
-## Submission
-
-At the end of the session, you will present your work. Plan for roughly **10 minutes**: a brief walkthrough of your pipeline architecture, a demo of your output table, and a few example patients showing your routing decisions.
-
-Bring any questions — we're available throughout.
-
-Good luck.

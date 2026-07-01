@@ -3,6 +3,7 @@
 **Medicare Part B wound-care billing triage dashboard** — built for the ABI Frameworks Hackathon.
 
 BandageBoard ingests patient data from a mock PointClickCare (PCC) EHR API, extracts wound details from clinical notes and structured assessments, and routes each patient to a biller decision in real time: **auto-accept**, **flag for review**, or **reject**.
+<img width="1283" height="671" alt="Screenshot 2026-06-30 at 10 45 30 PM" src="https://github.com/user-attachments/assets/d7bdbc6b-90b5-4a1b-b851-fec324849468" />
 
 ---
 

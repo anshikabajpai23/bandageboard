@@ -1,4 +1,4 @@
-<img width="1055" height="1491" alt="WhatsApp Image 2026-06-28 at 17 51 09" src="https://github.com/user-attachments/assets/6a7edb78-4b09-46b0-b5cc-d2b89c4f89e4" />
+
 # BandageBoard
 
 **Medicare Part B wound-care billing triage dashboard** — built for the ABI Frameworks Hackathon.
@@ -90,7 +90,7 @@ The routing engine (`lib/eligibility/engine.ts`) runs these rules **in order** f
 7. Missing required fields?       → flag_for_review   (missing ≠ negative)
 8. All fields present, confident, unconflicted → auto_accept
 ```
-
+<img width="500" height="700" alt="WhatsApp Image 2026-06-28 at 17 51 09" src="https://github.com/user-attachments/assets/6a7edb78-4b09-46b0-b5cc-d2b89c4f89e4" />
 Multi-wound patients: each wound gets its own decision. The patient-level decision mirrors the primary wound (`wounds[0]`, largest area).
 
 See [`threshold.md`](./threshold.md) for the full team contract behind these rules.

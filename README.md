@@ -1,3 +1,4 @@
+<img width="1055" height="1491" alt="WhatsApp Image 2026-06-28 at 17 51 09" src="https://github.com/user-attachments/assets/6a7edb78-4b09-46b0-b5cc-d2b89c4f89e4" />
 # BandageBoard
 
 **Medicare Part B wound-care billing triage dashboard** — built for the ABI Frameworks Hackathon.
